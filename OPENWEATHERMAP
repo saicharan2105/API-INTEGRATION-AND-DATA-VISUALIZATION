@@ -1,150 +1,106 @@
-# python3 -- Weather Application using API
-# importing the libraries
-from tkinter import *
-import requests
-import json
-import datetime
+import tkinter as tk
+from tkinter import messagebox
 from PIL import ImageTk, Image
+import requests, datetime, json
 
-
-# necessary details
-root = Tk()
+API_KEY = "d867dc87a156a09121983f0d1befee75"    # ← replace with your key if needed
+WIDTH, HEIGHT = 450, 700
+BG = "white"
+root = tk.Tk()
 root.title("Weather App")
-root.geometry("450x700")
-root['background'] = "white"
+root.geometry(f"{WIDTH}x{HEIGHT}")
+root.configure(bg=BG)
+root.resizable(False, False)
 
-# Image
-new = ImageTk.PhotoImage(Image.open('logo.png'))
-panel = Label(root, image=new)
-panel.place(x=0, y=520)
+logo_img = ImageTk.PhotoImage(Image.open("logo.png").resize((WIDTH, 160)))
+tk.Label(root, image=logo_img, bg=BG).place(x=0, y=520)
 
+now = datetime.datetime.now()
+tk.Label(root, text=now.strftime("%A"),      bg=BG, font=("Helvetica", 15, "bold")).place(x=5,   y=130)
+tk.Label(root, text=now.strftime("%d %B"),   bg=BG, font=("Helvetica", 15, "bold")).place(x=100, y=130)
+tk.Label(root, text=now.strftime("%I:%M %p"),bg=BG, font=("Helvetica", 15, "bold")).place(x=10,  y=160)
 
-# Dates
-dt = datetime.datetime.now()
-date = Label(root, text=dt.strftime('%A--'), bg='white', font=("bold", 15))
-date.place(x=5, y=130)
-month = Label(root, text=dt.strftime('%m %B'), bg='white', font=("bold", 15))
-month.place(x=100, y=130)
-
-# Time
-hour = Label(root, text=dt.strftime('%I : %M %p'),
-             bg='white', font=("bold", 15))
-hour.place(x=10, y=160)
-
-# Theme for the respective time the application is used
-if int((dt.strftime('%I'))) >= 8 & int((dt.strftime('%I'))) <= 5:
-    img = ImageTk.PhotoImage(Image.open('moon.png'))
-    panel = Label(root, image=img)
-    panel.place(x=210, y=200)
+if 6 <= now.hour < 18:           
+    icon_img = ImageTk.PhotoImage(Image.open("sun.png").resize((160, 160)))
 else:
-    img = ImageTk.PhotoImage(Image.open('sun.png'))
-    panel = Label(root, image=img)
-    panel.place(x=210, y=200)
+    icon_img = ImageTk.PhotoImage(Image.open("moon.png").resize((160, 160)))
+tk.Label(root, image=icon_img, bg=BG).place(x=210, y=200)
 
+city_var   = tk.StringVar()
+entry      = tk.Entry(root, textvariable=city_var, font=("Helvetica", 12))
+entry.grid(row=1, column=0, sticky="nsew", ipady=10, padx=5)
+entry.focus()
 
-# City Search
-city_name = StringVar()
-city_entry = Entry(root, textvariable=city_name, width=45)
-city_entry.grid(row=1, column=0, ipady=10, stick=W+E+N+S)
+def get_weather() -> None:
+    """Fetch weather for the city in entry box and update labels."""
+    city = city_var.get().strip()
+    if not city:
+        messagebox.showinfo("Input needed", "Please enter a city name.")
+        return
 
+    url = (f"https://api.openweathermap.org/data/2.5/weather"
+           f"?q={city}&units=metric&appid={API_KEY}")
+    try:
+        resp = requests.get(url, timeout=10)
+        resp.raise_for_status()
+        data = resp.json()
+    except requests.exceptions.RequestException as e:
+        messagebox.showerror("Network error", f"Could not reach service:\n{e}")
+        return
+    except json.JSONDecodeError:
+        messagebox.showerror("Parse error", "Received invalid response.")
+        return
 
-def city_name():
+    try:
+        main      = data["main"]
+        sys       = data["sys"]
+        coord     = data["coord"]
+        lbl_city.configure(text=data["name"])
+        lbl_country.configure(text=sys.get("country", "..."))
+        lbl_temp.configure(text=f'{main["temp"]:.1f} °C')
+        lbl_humi.configure(text=f'{main["humidity"]} %')
+        lbl_tmax.configure(text=f'{main["temp_max"]:.1f} °C')
+        lbl_tmin.configure(text=f'{main["temp_min"]:.1f} °C')
+        lbl_lon.configure(text=f'{coord["lon"]:.2f}')
+        lbl_lat.configure(text=f'{coord["lat"]:.2f}')
+    except KeyError:
+        messagebox.showerror("Data error",
+            "Weather information incomplete for this location.")
+        return
 
-    # API Call
-    api_key="d867dc87a156a09121983f0d1befee75"
-    api_request = requests.get("https://api.openweathermap.org/data/2.5/weather?q="
-                               + city_entry.get() + "&units=metric&appid="+api_key)
+btn = tk.Button(root, text="Search", command=get_weather)
+btn.grid(row=1, column=1, sticky="nsew")
 
-    api = json.loads(api_request.content)
+lbl_city    = tk.Label(root, text="…", bg=BG, font=("Helvetica", 15, "bold"))
+lbl_country = tk.Label(root, text="…", bg=BG, font=("Helvetica", 15, "bold"))
+lbl_city.place   (x=10,  y=63)
+lbl_country.place(x=135, y=63)
 
-    # Temperatures
-    y = api['main']
-    current_temprature = y['temp']
-    humidity = y['humidity']
-    tempmin = y['temp_min']
-    tempmax = y['temp_max']
+lbl_lon = tk.Label(root, text="…", bg=BG, font=("Helvetica", 15))
+lbl_lat = tk.Label(root, text="…", bg=BG, font=("Helvetica", 15))
+lbl_lon.place(x=25, y=95)
+lbl_lat.place(x=95, y=95)
 
-    # Coordinates
-    x = api['coord']
-    longtitude = x['lon']
-    latitude = x['lat']
+lbl_temp = tk.Label(root, text="…", bg=BG, fg="black",
+                    font=("Helvetica", 35, "bold"))
+lbl_temp.place(x=18, y=220)
 
-    # Country
-    z = api['sys']
-    country = z['country']
-    citi = api['name']
+tk.Label(root, text="Humidity:", bg=BG, font=("Helvetica", 15, "bold"))\
+    .place(x=3,  y=400)
+lbl_humi = tk.Label(root, text="…", bg=BG, font=("Helvetica", 15, "bold"))
+lbl_humi.place(x=130, y=400)
 
-    # Adding the received info into the screen
-    lable_temp.configure(text=current_temprature)
-    lable_humidity.configure(text=humidity)
-    max_temp.configure(text=tempmax)
-    min_temp.configure(text=tempmin)
-    lable_lon.configure(text=longtitude)
-    lable_lat.configure(text=latitude)
-    lable_country.configure(text=country)
-    lable_citi.configure(text=citi)
+tk.Label(root, text="Max Temp:", bg=BG, font=("Helvetica", 15, "bold"))\
+    .place(x=3,  y=430)
+lbl_tmax = tk.Label(root, text="…", bg=BG, font=("Helvetica", 15, "bold"))
+lbl_tmax.place(x=130, y=430)
 
+tk.Label(root, text="Min Temp:", bg=BG, font=("Helvetica", 15, "bold"))\
+    .place(x=3,  y=460)
+lbl_tmin = tk.Label(root, text="…", bg=BG, font=("Helvetica", 15, "bold"))
+lbl_tmin.place(x=130, y=460)
 
-# Search Bar and Button
-city_nameButton = Button(root, text="Search", command=city_name)
-city_nameButton.grid(row=1, column=1, padx=5, stick=W+E+N+S)
-
-
-# Country  Names and Coordinates
-lable_citi = Label(root, text="...", width=0, 
-                   bg='white', font=("bold", 15))
-lable_citi.place(x=10, y=63)
-
-lable_country = Label(root, text="...", width=0, 
-                      bg='white', font=("bold", 15))
-lable_country.place(x=135, y=63)
-
-lable_lon = Label(root, text="...", width=0,
-                  bg='white', font=("Helvetica", 15))
-lable_lon.place(x=25, y=95)
-lable_lat = Label(root, text="...", width=0,
-                  bg='white', font=("Helvetica", 15))
-lable_lat.place(x=95, y=95)
-
-# Current Temperature
-
-lable_temp = Label(root, text="...", width=0, bg='white',
-                   font=("Helvetica", 50), fg='black')
-lable_temp.place(x=18, y=220)
-
-# Other temperature details
-
-humi = Label(root, text="Humidity: ", width=0, 
-             bg='white', font=("bold", 15))
-humi.place(x=3, y=400)
-
-lable_humidity = Label(root, text="...", width=0,
-                       bg='white', font=("bold", 15))
-lable_humidity.place(x=107, y=400)
-
-
-maxi = Label(root, text="Max. Temp.: ", width=0, 
-             bg='white', font=("bold", 15))
-maxi.place(x=3, y=430)
-
-max_temp = Label(root, text="...", width=0, 
-                 bg='white', font=("bold", 15))
-max_temp.place(x=128, y=430)
-
-
-mini = Label(root, text="Min. Temp.: ", width=0, 
-             bg='white', font=("bold", 15))
-mini.place(x=3, y=460)
-
-min_temp = Label(root, text="...", width=0, 
-                 bg='white', font=("bold", 15))
-min_temp.place(x=128, y=460)
-
-
-# Note
-note = Label(root, text="All temperatures in degree celsius",
-             bg='white', font=("italic", 10))
-note.place(x=95, y=495)
-
+tk.Label(root, text="All temperatures in °C",
+         bg=BG, font=("Helvetica", 10, "italic")).place(x=95, y=495)
 
 root.mainloop()
