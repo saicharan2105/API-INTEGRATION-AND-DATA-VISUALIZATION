@@ -1,0 +1,70 @@
+import requests
+import pandas as pd
+import matplotlib.pyplot as plt
+import seaborn as sns
+from datetime import datetime
+
+# OpenWeatherMap API details
+API_KEY = 'd867dc87a156a09121983f0d1befee75'  # Replace with your actual API key
+CITY = 'Andhra Pradesh'
+URL = 'https://api.openweathermap.org/data/2.5/forecast'
+
+# Fetch weather data
+params = {'q': CITY, 'appid': API_KEY, 'units': 'metric'}
+response = requests.get(URL, params=params)
+data = response.json()
+
+# Parse forecast data
+weather_data = [{
+    'datetime': datetime.fromtimestamp(entry['dt']),
+    'temp': entry['main']['temp'],
+    'temp_min': entry['main']['temp_min'],
+    'temp_max': entry['main']['temp_max'],
+    'humidity': entry['main']['humidity'],
+    'wind_speed': entry['wind']['speed']
+} for entry in data['list']]
+
+df = pd.DataFrame(weather_data)
+df['date'] = df['datetime'].dt.date
+
+# Plotting
+sns.set(style="whitegrid")
+
+# Temperature trend
+plt.figure(figsize=(12, 5))
+sns.lineplot(x='datetime', y='temp', data=df, marker='o', label='Temperature')
+plt.xticks(rotation=45)
+plt.title(f"Temperature Forecast - {CITY}")
+plt.tight_layout()
+plt.show()
+
+# Humidity levels
+plt.figure(figsize=(12, 5))
+sns.barplot(x='datetime', y='humidity', data=df, palette='Blues_d')
+plt.xticks(rotation=45)
+plt.title(f"Humidity Forecast - {CITY}")
+plt.tight_layout()
+plt.show()
+
+# Wind speed trend
+plt.figure(figsize=(12, 5))
+sns.lineplot(x='datetime', y='wind_speed', data=df, marker='s', color='green')
+plt.xticks(rotation=45)
+plt.title(f"Wind Speed Forecast - {CITY}")
+plt.tight_layout()
+plt.show()
+
+# Daily average summary
+daily_avg = df.groupby('date').agg({
+    'temp': 'mean',
+    'humidity': 'mean',
+    'wind_speed': 'mean'
+}).reset_index()
+
+plt.figure(figsize=(12, 5))
+sns.lineplot(data=daily_avg, x='date', y='temp', label='Avg Temp')
+sns.lineplot(data=daily_avg, x='date', y='humidity', label='Avg Humidity')
+sns.lineplot(data=daily_avg, x='date', y='wind_speed', label='Avg Wind Speed')
+plt.title(f"Daily Averages - {CITY}")
+plt.tight_layout()
+plt.show()
